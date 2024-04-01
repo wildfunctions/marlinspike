@@ -2,10 +2,11 @@ local config = require("marlinspike.config")
 local finder = require("marlinspike.finder")
 
 local projects = {}
+local sorted_projects = {}
 local current_buffer = vim.api.nvim_buf_get_name(0)
+local current_project_index = 1
 
 local function on_save()
-  print("Current projects in add.... closure???: ", vim.inspect(projects))
   local current_file_path = vim.api.nvim_buf_get_name(0)
   local _projects, err = config.bump_project(projects, current_file_path)
   if err == nil then
@@ -24,8 +25,19 @@ function add_project()
   end
 end
 
+function load_next()
+  current_project_index = (current_project_index  % #sorted_projects) + 1
+  local next_project = sorted_projects[current_project_index]
+  local project = projects[next_project]
+  if project ~= nil then
+    vim.cmd("cd " .. next_project)
+    print("Changed project to: ", vim.fn.getcwd())
+  end
+end
+
 local function keybinds()
   vim.keymap.set("n", "<leader>ma", "<cmd>lua add_project()<CR>", {noremap = true, silent = true})
+  vim.keymap.set("n", "<leader>mn", "<cmd>lua load_next()<CR>", {noremap = true, silent = true})
 end
 
 local function init()
@@ -36,21 +48,20 @@ local function init()
 
   keybinds()
 
-  -- local unknown_projects = finder.find_unknown_projects()
-  -- for i = 1, #unknown_projects do
-  --   config.ensure_exists(projects, unknown_projects[i])
-  -- end
-  -- print("loaded unknown projects ", vim.inspect(unknown_projects))
+  local unknown_projects = finder.find_unknown_projects()
+  for i = 1, #unknown_projects do
+    config.ensure_exists(projects, unknown_projects[i])
+  end
 
-  -- vim.cmd("cd " .. projects[1])
-  -- vim.cmd("redraw!")
-  -- print("Changed directory to: ", vim.fn.getcwd())
-  --
+  for key, _ in pairs(projects) do
+      table.insert(sorted_projects, key)
+  end
+
   local _projects, err = config.bump_project(projects, current_buffer)
 
   current_buffer = vim.api.nvim_buf_get_name(0)
 
-  print("Marlinspike Projects: ", vim.inspect(projects))
+  print(#sorted_projects .. " projects loaded")
 end
 
 local function print_projects()

@@ -47,11 +47,10 @@ local function get_harpoon_projects()
 
   local ok2, harpoon_config = pcall(read_json_file, harpoon_config_file)
   if not ok2 then
-    -- print("Error reading config file: ", harpoon_config_file)
     return {}
   end
 
-  return harpoon_config["projects"]
+  return harpoon_config
 end
 
 local function find_unknown_projects()
