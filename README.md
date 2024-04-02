@@ -1,13 +1,13 @@
 # Marlinspike
 
-## The Problems
+## You Have Problems 
 1. You have too many projects scattered across the file system.
 2. You want a shortlist of projects that you are currently working on.
 
-## The Solution
+## We Have Solutions
 1. A simple UI that lists all your projects.
 2. A way to order the projects by activity and recency.
-3. Auto load projects from other plugins like harpoon.
+3. Autoload projects from other plugins like harpoon.
 
 ## Installation
 * install using [lazy.nvim](https://github.com/folke/lazy.nvim)
@@ -19,7 +19,10 @@
 ```
 
 ## Default Setup
-```lua
+
+These are the default keymaps:
+```
 <leader>ma : adds project to marlinspike list
-<leader>mn : opens next project in the list
+<leader>mn : opens next marlinspike project in the list
+<leader>me : toggles UI to select marlinspike project
 ```

@@ -1,14 +1,82 @@
 local config = require("marlinspike.config")
 local finder = require("marlinspike.finder")
+local ui = require("marlinspike.ui")
 
 local projects = {}
-local sorted_projects = {}
-local current_buffer = vim.api.nvim_buf_get_name(0)
-local current_project_index = 1
+local sortedProjects = {}
+local currentBuffer = vim.api.nvim_buf_get_name(0)
+local currentProjectIndex = 1
 
-local function on_save()
-  local current_file_path = vim.api.nvim_buf_get_name(0)
-  local _projects, err = config.bump_project(projects, current_file_path)
+local winId = nil
+local winBuf = nil
+local shouldBeOpen = false
+
+function addProject()
+  local project = finder.findGitRepoRoot()
+  if project ~= "" then
+    config.ensureExists(projects, project)
+  end
+end
+
+function loadNext()
+  currentProjectIndex = (currentProjectIndex  % #sortedProjects) + 1
+  local next_project = sortedProjects[currentProjectIndex]
+  local project = projects[next_project]
+  if project ~= nil then
+    vim.cmd("cd " .. next_project)
+    vim.loop.chdir(next_project)
+    print("Current working directory: ", vim.fn.getcwd())
+  end
+end
+
+function loadByIndex(index)
+  local next_project = sortedProjects[index]
+  local project = projects[next_project]
+  if project ~= nil then
+    vim.cmd("cd " .. next_project)
+    vim.loop.chdir(next_project)
+    print("Current working directory: ", vim.fn.getcwd())
+  end
+end
+
+function closeMenu(selectProject)
+  local currentLine = vim.fn.line(".")
+
+  ui.closeMenu(winId)
+  winId = nil
+  winBuf = nil
+  if selectProject then
+    loadByIndex(currentLine)
+  end
+  shouldBeOpen = false
+end
+
+
+local function openMenu()
+  if winId ~= nil then
+    local isMenuOpen = vim.api.nvim_win_is_valid(winId)
+    closeMenu(false)
+    if isMenuOpen then
+      return
+    end
+  end
+  local menu = ui.createMenu(sortedProjects)
+  winId = menu.winId
+  winBuf = menu.bufnr
+  vim.api.nvim_buf_set_keymap(winBuf, "n", "<CR>", "<Cmd>lua closeMenu(true)<CR>", {silent = true})
+  shouldBeOpen = true
+end
+
+local function setDefaultKeymaps()
+  vim.keymap.set("n", "<leader>ma", function() addProject() end, {noremap = true, silent = true})
+  vim.keymap.set("n", "<leader>mn", function() loadNext() end, {noremap = true, silent = true})
+
+  vim.keymap.set("n", "<leader>me", function() openMenu() end, {noremap = true, silent = true})
+end
+
+local function onSave()
+  local currentFilePath = vim.api.nvim_buf_get_name(0)
+  local _projects, err = config.bumpProject(projects, currentFilePath)
   if err == nil then
     projects = _projects
   end
@@ -18,57 +86,37 @@ local function on_save()
   -- end
 end
 
-function add_project()
-  local project = finder.find_git_repo_root()
-  if project ~= "" then
-    config.ensure_exists(projects, project)
-  end
-end
-
-function load_next()
-  current_project_index = (current_project_index  % #sorted_projects) + 1
-  local next_project = sorted_projects[current_project_index]
-  local project = projects[next_project]
-  if project ~= nil then
-    vim.cmd("cd " .. next_project)
-    print("Changed project to: ", vim.fn.getcwd())
-  end
-end
-
-local function keybinds()
-  vim.keymap.set("n", "<leader>ma", "<cmd>lua add_project()<CR>", {noremap = true, silent = true})
-  vim.keymap.set("n", "<leader>mn", "<cmd>lua load_next()<CR>", {noremap = true, silent = true})
-end
-
 local function init()
   vim.api.nvim_create_autocmd("BufWritePost", {
     pattern = "*",
-    callback = on_save
+    callback = onSave
   })
 
-  keybinds()
+  setDefaultKeymaps()
 
-  local unknown_projects = finder.find_unknown_projects()
-  for i = 1, #unknown_projects do
-    config.ensure_exists(projects, unknown_projects[i])
+  local unknownProjects = finder.findUnknownProjects()
+  for i = 1, #unknownProjects do
+    config.ensureExists(projects, unknownProjects[i])
   end
 
   for key, _ in pairs(projects) do
-      table.insert(sorted_projects, key)
+    table.insert(sortedProjects, key)
   end
 
-  local _projects, err = config.bump_project(projects, current_buffer)
+  local _projects, err = config.bumpProject(projects, currentBuffer)
 
-  current_buffer = vim.api.nvim_buf_get_name(0)
+  currentBuffer = vim.api.nvim_buf_get_name(0)
 
-  print(#sorted_projects .. " projects loaded")
+  print(#sortedProjects .. " projects loaded")
 end
 
-local function print_projects()
+local function printProjects()
   print(vim.inspect(projects))
 end
 
 return {
   init = init,
-  print_projects = print_projects
+  printProjects = printProjects,
+  addProject = addProject,
+  loadNext = loadNext
 }

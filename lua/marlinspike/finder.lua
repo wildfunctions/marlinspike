@@ -1,12 +1,12 @@
 local Path = require("plenary.path")
 
-local harpoon_config_file = string.format("%s/harpoon.json", vim.fn.stdpath("data"))
+local harpoonConfigFile = string.format("%s/harpoon.json", vim.fn.stdpath("data"))
 
-local function read_json_file(file)
+local function readJsonFile(file)
     return vim.json.decode(Path:new(file):read())
 end
 
-local function is_git_repo(path)
+local function isGitRepo(path)
   local uv = vim.loop
   local git_path = path .. "/.git"
   local stat = uv.fs_stat(git_path)
@@ -18,7 +18,7 @@ local function is_git_repo(path)
   return false
 end
 
-local function find_git_repo_root()
+local function findGitRepoRoot()
   local current_buffer = vim.api.nvim_buf_get_name(0)
 
   -- Use git to find the root directory of the repo
@@ -39,37 +39,37 @@ local function find_git_repo_root()
   return result
 end
 
-local function get_harpoon_projects()
+local function getHarpoonProjects()
   local ok, module = pcall(require, "harpoon")
   if not ok then
     return {}
   end
 
-  local ok2, harpoon_config = pcall(read_json_file, harpoon_config_file)
+  local ok2, harpoonConfig = pcall(readJsonFile, harpoonConfigFile)
   if not ok2 then
     return {}
   end
 
-  return harpoon_config
+  return harpoonConfig
 end
 
-local function find_unknown_projects()
+local function findUnknownProjects()
   local uv = vim.loop
-  local paths_with_git = {}
+  local pathsWithGit = {}
 
-  local harpoon_projects = get_harpoon_projects()
-  if harpoon_projects ~= nil then
-    for key, _ in pairs(harpoon_projects) do
-      if is_git_repo(key) then
-        table.insert(paths_with_git, key)
+  local harpoonProjects = getHarpoonProjects()
+  if harpoonProjects ~= nil then
+    for key, _ in pairs(harpoonProjects) do
+      if isGitRepo(key) then
+        table.insert(pathsWithGit, key)
       end
     end
   end
 
-  return paths_with_git
+  return pathsWithGit
 end
 
 return {
-  find_unknown_projects = find_unknown_projects,
-  find_git_repo_root = find_git_repo_root
+  findUnknownProjects = findUnknownProjects,
+  findGitRepoRoot = findGitRepoRoot
 }
