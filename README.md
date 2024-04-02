@@ -1,5 +1,7 @@
 # Marlinspike
 
+![alt text](https://github.com/wildfunctions/images/blob/main/marlinspike.png)
+
 ## You Have Problems 
 1. You have too many projects scattered across the file system.
 2. You want a shortlist of projects that you are currently working on.
