@@ -1,9 +1,21 @@
-local Path = require("plenary.path")
+local utils = require("marlinspike.utils")
 
 local harpoonConfigFile = string.format("%s/harpoon.json", vim.fn.stdpath("data"))
 
-local function readJsonFile(file)
-    return vim.json.decode(Path:new(file):read())
+--- Get the root directory of the project by using the git command
+--- If the git command fails then use the current working directory
+---@return string | nil
+local function getProjectRoot(config)
+  local cwd = vim.loop.cwd()
+  if config.useGitRoot then
+    local root = vim.fn.system("git rev-parse --show-toplevel")
+    if vim.v.shell_error == 0 and root ~= nil then
+      local path = string.gsub(root, "\n", "")
+      path = string.gsub(path, "[\n\r]+$", "")
+      return path
+    end
+  end
+  return cwd
 end
 
 local function isGitRepo(path)
@@ -18,34 +30,13 @@ local function isGitRepo(path)
   return false
 end
 
-local function findGitRepoRoot()
-  local current_buffer = vim.api.nvim_buf_get_name(0)
-
-  -- Use git to find the root directory of the repo
-  --
-  -- git rev-parse --show-toplevel
-  local git_cmd = "git rev-parse --show-toplevel"
-  local result = vim.fn.system(git_cmd)
-
-  -- vim.fn.system returns the command output including a trailing newline, so we trim it
-  result = string.gsub(result, "[\n\r]+$", "")
-
-  -- Check for error in result. If git command fails, it usually returns a non-zero exit code and an error message.
-  if vim.v.shell_error ~= 0 then
-    print("Error finding Git root: " .. result)
-    return nil
-  end
-
-  return result
-end
-
 local function getHarpoonProjects()
   local ok, module = pcall(require, "harpoon")
   if not ok then
     return {}
   end
 
-  local ok2, harpoonConfig = pcall(readJsonFile, harpoonConfigFile)
+  local ok2, harpoonConfig = pcall(utils.readJsonFile, harpoonConfigFile)
   if not ok2 then
     return {}
   end
@@ -60,6 +51,8 @@ local function findUnknownProjects()
   local harpoonProjects = getHarpoonProjects()
   if harpoonProjects ~= nil then
     for key, _ in pairs(harpoonProjects) do
+      -- TODO: make this configurable
+      -- why is my harpoon is full of junk that aren't git repos
       if isGitRepo(key) then
         table.insert(pathsWithGit, key)
       end
@@ -71,5 +64,5 @@ end
 
 return {
   findUnknownProjects = findUnknownProjects,
-  findGitRepoRoot = findGitRepoRoot
+  getProjectRoot = getProjectRoot,
 }

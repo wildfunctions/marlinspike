@@ -1,86 +1,117 @@
-local config = require("marlinspike.config")
+local state = require("marlinspike.state")
 local finder = require("marlinspike.finder")
 local ui = require("marlinspike.ui")
+local utils = require("marlinspike.utils")
 
-local projects = {}
-local sortedProjects = {}
-local currentBuffer = vim.api.nvim_buf_get_name(0)
+-- speed over memory footprint
+local projectsMap = {}
+local sortedProjectsArray = {}
+
+local currentBuffer = nil
 local currentProjectIndex = 1
+local configFile = string.format("%s/marlinspike.json", vim.fn.stdpath("data"))
 
 local winId = nil
 local winBuf = nil
 
-function addProject()
-  local project = finder.findGitRepoRoot()
-  if project ~= "" then
-    config.ensureExists(projects, project)
+local defaults = {
+  autoInit = true,
+  useDefaultKeymaps = true,
+  useGitRoot = true,
+  debug = false
+}
+local config = {}
+
+local function buildSortedProjectsList()
+  sortedProjectsArray = {}
+  for key, value in pairs(projectsMap) do
+    local element = utils.shallowClone(value)
+    element.name = key
+    table.insert(sortedProjectsArray, element)
   end
+  state.sortProjects(sortedProjectsArray)
 end
 
-function loadNext()
-  currentProjectIndex = (currentProjectIndex  % #sortedProjects) + 1
-  local next_project = sortedProjects[currentProjectIndex]
-  local project = projects[next_project]
+local function saveProjects()
+  utils.writeJsonFile(configFile, projectsMap)
+  buildSortedProjectsList()
+end
+
+function AddProject()
+  local projectRoot = finder.getProjectRoot(config)
+  if projectRoot == nil then
+    print("Could not find project root")
+    return
+  end
+
+  state.ensureProjectExists(projectsMap, projectRoot)
+  saveProjects()
+end
+
+function LoadNext()
+  currentProjectIndex = (currentProjectIndex  % #sortedProjectsArray) + 1
+  local nextProject = sortedProjectsArray[currentProjectIndex].name
+  local project = projectsMap[nextProject]
   if project ~= nil then
-    vim.cmd("cd " .. next_project)
-    vim.loop.chdir(next_project)
+    vim.cmd("cd " .. nextProject)
+    vim.loop.chdir(nextProject)
     print("Current working directory: ", vim.fn.getcwd())
   end
 end
 
-function loadByIndex(index)
-  local next_project = sortedProjects[index]
-  local project = projects[next_project]
+function LoadByIndex(index)
+  local nextProject = sortedProjectsArray[index].name
+  local project = projectsMap[nextProject]
   if project ~= nil then
-    vim.cmd("cd " .. next_project)
-    vim.loop.chdir(next_project)
+    vim.cmd("cd " .. nextProject)
+    vim.loop.chdir(nextProject)
     print("Current working directory: ", vim.fn.getcwd())
   end
 end
 
-function closeMenu(selectProject)
+function CloseMenu(selectProject)
   local currentLine = vim.fn.line(".")
 
   ui.closeMenu(winId)
   winId = nil
   winBuf = nil
   if selectProject then
-    loadByIndex(currentLine)
+    LoadByIndex(currentLine)
   end
 end
-
 
 local function openMenu()
   if winId ~= nil then
     local isMenuOpen = vim.api.nvim_win_is_valid(winId)
-    closeMenu(false)
+    CloseMenu(false)
     if isMenuOpen then
       return
     end
   end
-  local menu = ui.createMenu(sortedProjects)
+  local menu = ui.createMenu(sortedProjectsArray)
   winId = menu.winId
   winBuf = menu.bufnr
-  vim.api.nvim_buf_set_keymap(winBuf, "n", "<CR>", "<Cmd>lua closeMenu(true)<CR>", {silent = true})
+  vim.api.nvim_buf_set_keymap(winBuf, "n", "<CR>", "<Cmd>lua CloseMenu(true)<CR>", {silent = true})
 end
 
 local function setDefaultKeymaps()
-  vim.keymap.set("n", "<leader>ma", function() addProject() end, {noremap = true, silent = true})
-  vim.keymap.set("n", "<leader>mn", function() loadNext() end, {noremap = true, silent = true})
+  vim.keymap.set("n", "<leader>ma", function() AddProject() end, {noremap = true, silent = true})
+  vim.keymap.set("n", "<leader>mn", function() LoadNext() end, {noremap = true, silent = true})
 
   vim.keymap.set("n", "<leader>me", function() openMenu() end, {noremap = true, silent = true})
 end
 
 local function onSave()
   local currentFilePath = vim.api.nvim_buf_get_name(0)
-  local _projects, err = config.bumpProject(projects, currentFilePath)
+  local _projects, err = state.bumpProject(projectsMap, currentFilePath)
   if err == nil then
-    projects = _projects
+    projectsMap = _projects
+    saveProjects()
   end
 
-  -- if err ~= nil then
-  --   print("Error bumping project: ", err)
-  -- end
+  if err ~= nil then
+    print("Error bumping project: ", err)
+  end
 end
 
 local function init()
@@ -89,32 +120,45 @@ local function init()
     callback = onSave
   })
 
-  setDefaultKeymaps()
+  if config.useDefaultKeymaps then
+    setDefaultKeymaps()
+  end
 
+  local projects = utils.readJsonFile(configFile)
+  if projects ~= nil then
+    projectsMap = projects
+  end
   local unknownProjects = finder.findUnknownProjects()
   for i = 1, #unknownProjects do
-    config.ensureExists(projects, unknownProjects[i])
+    state.ensureProjectExists(projectsMap, unknownProjects[i])
   end
 
-  for key, _ in pairs(projects) do
-    table.insert(sortedProjects, key)
+  buildSortedProjectsList()
+  if config.debug then
+    print(#sortedProjectsArray .. " projects loaded")
   end
-
-  local _projects, err = config.bumpProject(projects, currentBuffer)
-
-  currentBuffer = vim.api.nvim_buf_get_name(0)
-
-  print(#sortedProjects .. " projects loaded")
 end
 
 local function printProjects()
-  print(vim.inspect(projects))
+  print(vim.inspect(projectsMap))
+end
+
+local function setup(userOpts)
+  userOpts = userOpts or {}
+  config = vim.tbl_deep_extend("force", defaults, userOpts)
+  if config.autoInit then
+    init()
+  end
+
+  if config.debug then
+    print("Marlinspike setup with config: ", vim.inspect(config))
+  end
 end
 
 return {
-  init = init,
+  setup = setup,
   printProjects = printProjects,
-  addProject = addProject,
-  loadNext = loadNext,
+  addProject = AddProject,
+  loadNext = LoadNext,
   openMenu = openMenu
 }

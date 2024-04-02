@@ -1,8 +1,13 @@
 local popup = require("plenary.popup")
 
-function createMenu(opts)
-  if opts == nil then
-    opts = {}
+local function createMenu(projects)
+  if projects == nil then
+    projects = {}
+  end
+
+  local opts = {}
+  for i, project in ipairs(projects) do
+    opts[i] = project.name
   end
 
   local height = 20
@@ -26,7 +31,7 @@ function createMenu(opts)
   }
 end
 
-function closeMenu(winId)
+local function closeMenu(winId)
   if vim.api.nvim_win_is_valid(winId) then
     vim.api.nvim_win_close(winId, true)
   end
