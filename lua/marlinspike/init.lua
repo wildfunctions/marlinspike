@@ -9,7 +9,6 @@ local currentProjectIndex = 1
 
 local winId = nil
 local winBuf = nil
-local shouldBeOpen = false
 
 function addProject()
   local project = finder.findGitRepoRoot()
@@ -48,7 +47,6 @@ function closeMenu(selectProject)
   if selectProject then
     loadByIndex(currentLine)
   end
-  shouldBeOpen = false
 end
 
 
@@ -64,7 +62,6 @@ local function openMenu()
   winId = menu.winId
   winBuf = menu.bufnr
   vim.api.nvim_buf_set_keymap(winBuf, "n", "<CR>", "<Cmd>lua closeMenu(true)<CR>", {silent = true})
-  shouldBeOpen = true
 end
 
 local function setDefaultKeymaps()
@@ -118,5 +115,6 @@ return {
   init = init,
   printProjects = printProjects,
   addProject = addProject,
-  loadNext = loadNext
+  loadNext = loadNext,
+  openMenu = openMenu
 }
