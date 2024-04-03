@@ -108,10 +108,6 @@ local function onSave()
     projectsMap = _projects
     saveProjects()
   end
-
-  if err ~= nil then
-    print("Error bumping project: ", err)
-  end
 end
 
 local function init()
